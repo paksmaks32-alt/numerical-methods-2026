@@ -18,7 +18,7 @@ with open("tabulation_results.txt", "w", encoding="utf-8") as f:
         line = f"{i:2d} | {point['latitude']:.6f} | {point['longitude']:.6f} | {point['elevation']:.2f}"
         print(line)
         f.write(line + "\n")
-print("\n[!] Табуляцію успішно збережено у файл 'tabulation_results.txt'.")
+print("\n Табуляцію успішно збережено у файл 'tabulation_results.txt'.")
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371000
@@ -42,7 +42,7 @@ for i in range(n):
     print(f"{i:2d} | {distances[i]:10.2f} | {elevations[i]:8.2f}")
 
 print("\n--- ПУНКТ 5: Побудова базового графіка ---")
-print("Відкривається вікно з графіком... (закрийте його, щоб продовжити)")
+print("Відкривається вікно з графіком")
 plt.figure(figsize=(10, 5))
 plt.plot(distances, elevations, 'ro-', label='Дискретні точки маршруту')
 plt.title('Профіль маршруту: Заросляк - Говерла')
@@ -103,7 +103,6 @@ for i in range(min(5, n)):
 print("...")
 
 print("\n--- ПУНКТ 9: Коефіцієнти a_i, b_i, d_i ---")
-
 
 def calculate_abd(elev, c_coeff, h_step):
     intervals = len(elev) - 1

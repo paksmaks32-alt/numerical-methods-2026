@@ -1,113 +1,103 @@
+import math
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
 
-def form_matrix(x, m):
-    A = np.zeros((m + 1, m + 1))
-    for i in range(m + 1):
-        for j in range(m + 1):
-            A[i, j] = np.sum(x**(i + j))
-    return A
+# Додаємо підтримку інтерактивного режиму (якщо працюєш у VS Code або PyCharm)
+# #%% [markdown]
+# # Лабораторна робота №5
+# ## Чисельне диференціювання
 
-def form_vector(x, y, m):
-    b = np.zeros(m + 1)
-    for i in range(m + 1):
-        b[i] = np.sum(y * (x**i))
-    return b
+# --- 1. ОПИС ФУНКЦІЙ ---
+def M(t):
+    """Функція вологості грунту M(t)"""
+    return 50 * np.exp(-0.1 * t) + 5 * np.sin(t)
 
-def gauss_solve(A, b):
-    n = len(b)
-    A = A.astype(float).copy()
-    b = b.astype(float).copy()
+def M_fpoch(t):
+    """Точна аналітична похідна M'(t)"""
+    return -5 * np.exp(-0.1 * t) + 5 * np.cos(t)
 
-    for k in range(n):
-        max_row = k + np.argmax(np.abs(A[k:, k]))
-        A[[k, max_row]] = A[[max_row, k]]
-        b[[k, max_row]] = b[[max_row, k]]
+def Nabl_poch(t, h):
+    """Наближена похідна (центральна різниця)"""
+    return (M(t + h) - M(t - h)) / (2 * h)
 
-        for i in range(k + 1, n):
-            factor = A[i, k] / A[k, k]
-            A[i, k:] -= factor * A[k, k:]
-            b[i] -= factor * b[k]
+# Налаштування параметрів
+t0 = 1.0
+h = 0.01
+exact = M_fpoch(t0)
 
-    x_sol = np.zeros(n)
-    for i in range(n - 1, -1, -1):
-        x_sol[i] = (b[i] - np.dot(A[i, i + 1:], x_sol[i + 1:])) / A[i, i]
-    return x_sol
+# --- 2. ОБЧИСЛЕННЯ ---
+# Крок h, h/2, h/4
+Dh = Nabl_poch(t0, h)
+Dh2 = Nabl_poch(t0, h/2)
+Dh4 = Nabl_poch(t0, h/4)
 
-def polynomial(x, coef):
-    y_poly = np.zeros_like(x, dtype=float)
-    for i, c in enumerate(coef):
-        y_poly += c * (x**i)
-    return y_poly
+# Похибки
+R1 = abs(Dh - exact)
+R1_half = abs(Dh2 - exact)
 
-def variance(y_true, y_approx):
-    """Обчислення дисперсії"""
-    return np.sqrt(np.mean((y_true - y_approx)**2))
+# Метод Рунге-Ромберга (уточнення)
+f_Runge = Dh2 + (Dh2 - Dh) / 3
+R2 = abs(f_Runge - exact)
 
-# --- ОСНОВНИЙ БЛОК ПРОГРАМИ ---
-try:
-    df = pd.read_csv('data.csv')
-    x_data = df['Month'].values
-    y_data = df['temp'].values
-    print("Дані успішно зчитано з файлу data.csv")
-except Exception as e:
-    print(f"Помилка при зчитуванні файлу: {e}")
-    exit()
+# Метод Ейткена
+f_Eitken = (Dh2**2 - Dh4 * Dh) / (2 * Dh2 - (Dh4 + Dh))
+R3 = abs(f_Eitken - exact)
 
-# 2. Знаходження многочлена та обчислення дисперсії для m=1..10
-variances = []
-max_degree = 10
-for m in range(1, max_degree + 1):
-    A_mat = form_matrix(x_data, m)
-    b_vec = form_vector(x_data, y_data, m)
-    coeffs = gauss_solve(A_mat, b_vec)
-    y_pred = polynomial(x_data, coeffs)
-    var = variance(y_data, y_pred)
-    variances.append(var)
-    print(f"Степінь m={m}: Дисперсія = {var:.4f}")
+# Порядок точності p
+p = (1 / math.log(2)) * math.log(abs((Dh4 - Dh2) / (Dh2 - Dh)))
 
-optimal_m = np.argmin(variances) + 1
-print(f"\nОптимальний степінь: {optimal_m}")
+# --- 3. ВИВІД У КОНСОЛЬ (Красива таблиця) ---
+print("="*50)
+print(f"{'МЕТОД':<25} | {'ЗНАЧЕННЯ':<12} | {'ПОХИБКА':<10}")
+print("-"*50)
+print(f"{'Точне значення':<25} | {exact:<12.6f} | {'-'*10}")
+print(f"{'Центральна різниця (h)':<25} | {Dh:<12.6f} | {R1:<10.2e}")
+print(f"{'Центральна різниця (h/2)':<25} | {Dh2:<12.6f} | {R1_half:<10.2e}")
+print(f"{'Рунге-Ромберг':<25} | {f_Runge:<12.6f} | {R2:<10.2e}")
+print(f"{'Ейткен':<25} | {f_Eitken:<12.6f} | {R3:<10.2e}")
+print("-"*50)
+print(f"Порядок точності p: {p:.4f}")
+print("="*50)
 
-# Побудова фінальної моделі з оптимальним m
-A_opt = form_matrix(x_data, optimal_m)
-b_opt = form_vector(x_data, y_data, optimal_m)
-final_coeffs = gauss_solve(A_opt, b_opt)
-y_approx = polynomial(x_data, final_coeffs)
+# --- 4. ВІЗУАЛІЗАЦІЯ ---
+# Налаштовуємо стиль, щоб графіки були "вбудовані"
+plt.rcParams['figure.facecolor'] = 'white'
+fig, axs = plt.subplots(2, 2, figsize=(12, 9))
+plt.subplots_adjust(hspace=0.3, wspace=0.25)
 
-# Екстраполяція прогнозу на наступні 3 місяці
-x_future = np.array([25, 26, 27])
-y_future = polynomial(x_future, final_coeffs)
-print(f"Прогноз на місяці 25, 26, 27: {y_future}")
+t_vals = np.linspace(0, 20, 500)
 
-plt.figure(figsize=(12, 8))
+# 1. Графік функції
+axs[0, 0].plot(t_vals, M(t_vals), color='#2c3e50')
+axs[0, 0].set_title("Модель вологості $M(t)$")
+axs[0, 0].grid(True, linestyle='--', alpha=0.7)
 
-# Графік апроксимації
-plt.subplot(2, 1, 1)
-plt.scatter(x_data, y_data, color='red', label='Фактичні дані (CSV)')
-plt.plot(x_data, y_approx, label=f'Поліном (m={optimal_m})', color='blue')
-plt.scatter(x_future, y_future, color='green', label='Прогноз (3 міс.)', zorder=5)
-plt.title('Апроксимація температури (МНК)')
-plt.legend()
-plt.grid(True)
+# 2. Графік похідної
+axs[0, 1].plot(t_vals, M_fpoch(t_vals), color='#27ae60')
+axs[0, 1].axvline(t0, color='red', linestyle=':', label=f't={t0}')
+axs[0, 1].set_title("Швидкість зміни $M'(t)$")
+axs[0, 1].legend()
+axs[0, 1].grid(True, linestyle='--', alpha=0.7)
 
-plt.subplot(2, 1, 2)
-error = np.abs(y_data - y_approx)
-plt.bar(x_data, error, color='gray', label='Похибка |f(x) - phi(x)|')
-plt.axhline(0, color='black', lw=1)
-plt.title('Графік похибки апроксимації')
-plt.legend()
-plt.grid(True)
+# 3. Log-Log графік похибки
+h_range = np.logspace(-8, 0, 100)
+err_h = [abs(Nabl_poch(t0, hi) - exact) for hi in h_range]
+axs[1, 0].loglog(h_range, err_h, color='#e74c3c')
+axs[1, 0].set_title("Залежність похибки від кроку $h$")
+axs[1, 0].set_xlabel("h")
+axs[1, 0].grid(True, which="both", alpha=0.3)
 
-plt.tight_layout()
-plt.show()
+# 4. Порівняння методів
+names = ['h', 'h/2', 'R-R', 'Eitken']
+errs = [R1, R1_half, R2, R3]
+colors = ['#bdc3c7', '#95a5a6', '#3498db', '#2ecc71']
+bars = axs[1, 1].bar(names, errs, color=colors)
+axs[1, 1].set_yscale('log')
+axs[1, 1].set_title("Порівняння похибок (Log Scale)")
 
-# Графік залежності дисперсії від степеня полінома
-plt.figure(figsize=(8, 4))
-plt.plot(range(1, max_degree + 1), variances, marker='o', linestyle='--')
-plt.xlabel('Степінь m')
-plt.ylabel('Дисперсія')
-plt.title('Залежність дисперсії від степеня')
-plt.grid(True)
+for bar in bars:
+    yval = bar.get_height()
+    axs[1, 1].text(bar.get_x() + bar.get_width()/2, yval, f'{yval:.1e}', ha='center', va='bottom', fontsize=8)
+
+# Відображення
 plt.show()

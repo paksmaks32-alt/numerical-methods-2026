@@ -1,6 +1,8 @@
+import csv
 import numpy as np
 import matplotlib.pyplot as plt
-import csv
+from scipy.interpolate import CubicSpline
+
 
 def read_data(filename):
     x, y = [], []
@@ -13,6 +15,7 @@ def read_data(filename):
     except Exception as e:
         print(f"Помилка зчитування файлу: {e}")
     return np.array(x), np.array(y)
+
 
 def divided_differences(x, y, print_table=False):
     n = len(y)
@@ -37,7 +40,9 @@ def divided_differences(x, y, print_table=False):
         for i in range(n):
             row_str = f"{x[i]:<8.0f} | "
             for j in range(n - i):
-                row_str += f"{coef[i, j]:<10.6f} | "
+                val = coef[i, j]
+                if abs(val) < 1e-10: val = 0.0  # Прибираємо мінуси біля нулів
+                row_str += f"{val:<10.6f} | "
             print(row_str)
         print("=" * 70 + "\n")
 
@@ -62,6 +67,7 @@ def omega_n(x_nodes, x_val):
         res *= (x_val - xi)
     return res
 
+
 def finite_differences(y):
     n = len(y)
     diffs = np.zeros((n, n))
@@ -85,13 +91,6 @@ def factorial_polynomial_interpolation(x_nodes, y_nodes, x_val):
         factorial *= i
         result += (diffs[i] * t_term) / factorial
     return result
-
-
-def test_function(x):
-    return np.sin(x)
-def runge_function(x):
-    return 1.0 / (1.0 + 25.0 * x ** 2)
-
 
 
 def run_variant_4():
@@ -124,11 +123,11 @@ def run_variant_4():
     axes[0].legend()
     axes[0].grid(True)
 
-    axes[1].plot(x_plot, y_plot_omega, 'm-', label='Функція \u03c9_n(x)', linewidth=2)
+    axes[1].plot(x_plot, y_plot_omega, 'm-', label='Функція ω_n(x)', linewidth=2)
     axes[1].axhline(0, color='black', linewidth=0.5)
-    axes[1].set_title('Оцінка похибки: функція \u03c9_n(x)')
+    axes[1].set_title('Оцінка похибки: функція ω_n(x)')
     axes[1].set_xlabel('Кількість завдань')
-    axes[1].set_ylabel('Значення \u03c9_n(x)')
+    axes[1].set_ylabel('Значення ω_n(x)')
     axes[1].legend()
     axes[1].grid(True)
 
@@ -137,20 +136,24 @@ def run_factorial_demo():
     print("=" * 70)
     print(" ДЕМОНСТРАЦІЯ: ФАКТОРІАЛЬНІ МНОГОЧЛЕНИ ")
     print("=" * 70)
-    print("метод факторіальних многочленів тестується на функції sin(x) з рівним кроком h=1.0\n")
+    print("Генеруємо точки з рівним кроком h=4000 на основі кубічного сплайну:\n")
 
-    x_uniform = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
-    y_uniform = np.sin(x_uniform)
-    target_val = 2.5
+    x_nodes, y_nodes = read_data("data.csv")
+    if len(x_nodes) == 0: return
+    f_true = CubicSpline(x_nodes, y_nodes)
+
+    x_uniform = np.array([4000.0, 8000.0, 12000.0, 16000.0, 20000.0])
+    y_uniform = f_true(x_uniform)
+    target_val = 15000
 
     res_newton = newton_interpolation(x_uniform, y_uniform, target_val)
     res_factorial = factorial_polynomial_interpolation(x_uniform, y_uniform, target_val)
-    res_exact = np.sin(target_val)
+    res_exact = f_true(target_val)
 
-    print(f"Шукаємо sin({target_val}):")
-    print(f"Точне значення:      {res_exact:.6f}")
-    print(f"Ньютон:              {res_newton:.6f}")
-    print(f"Факторіальний поліном: {res_factorial:.6f}")
+    print(f"Шукаємо прогноз для {target_val}:")
+    print(f"Точне значення (Сплайн): {res_exact:.6f}")
+    print(f"Ньютон:                  {res_newton:.6f}")
+    print(f"Факторіальний поліном:   {res_factorial:.6f}")
     print("-> Результати збігаються, алгоритм реалізовано успішно!\n")
 
 
@@ -158,48 +161,46 @@ def run_research_part():
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
     nodes = [5, 10, 20]
 
+    x_nodes, y_nodes = read_data("data.csv")
+    if len(x_nodes) == 0: return
+
+    f_true = CubicSpline(x_nodes, y_nodes)
+    a, b = x_nodes[0], x_nodes[-1]
+
     # Пункт 1
-    a, b = 0, 10
     x_dense = np.linspace(a, b, 500)
-    y_true = test_function(x_dense)
-    axes[0].plot(x_dense, y_true, 'k-', lw=2, label='sin(x)')
+    y_true = f_true(x_dense)
+    axes[0].plot(x_dense, y_true, 'k-', lw=2, label='Еталонна функція')
     for n in nodes:
         x_n = np.linspace(a, b, n)
-        y_n = test_function(x_n)
+        y_n = f_true(x_n)
         y_interp = [newton_interpolation(x_n, y_n, xi) for xi in x_dense]
         axes[0].plot(x_dense, y_interp, '--', label=f'n={n}')
-    axes[0].set_title('Пункт 1: Фіксований інтервал [0, 10]')
+    axes[0].set_title(f'Пункт 1: Фіксований інтервал [{a:.0f}, {b:.0f}]')
     axes[0].legend()
     axes[0].grid(True)
 
     # Пункт 2
-    h = 0.5
-    a = 0
-    max_b = a + h * max(nodes)
-    x_dense2 = np.linspace(a, max_b, 500)
-    y_true2 = test_function(x_dense2)
-    axes[1].plot(x_dense2, y_true2, 'k-', lw=2, label='sin(x)')
-    for n in nodes:
+    h = 1000
+    axes[1].plot(x_dense, y_true, 'k-', lw=2, label='Еталонна функція')
+    for n in [5, 10, 15]:  # Зменшив вузли, щоб не виходити за межі 20000
         b_n = a + h * n
         x_n = np.linspace(a, b_n, n)
-        y_n = test_function(x_n)
-        x_plot_n = np.linspace(a, b_n, 200)
+        y_n = f_true(x_n)
+        x_plot_n = np.linspace(a, min(b, b_n), 200)
         y_interp = [newton_interpolation(x_n, y_n, xi) for xi in x_plot_n]
-        axes[1].plot(x_plot_n, y_interp, '--', label=f'n={n}, b={b_n}')
+        axes[1].plot(x_plot_n, y_interp, '--', label=f'n={n}, b={b_n:.0f}')
     axes[1].set_title(f'Пункт 2: Фіксований крок h={h}')
-    axes[1].legend()
+    axes[1].legend(loc='lower right')
     axes[1].grid(True)
 
-    # Пункт 3 (Рунге)
-    x_runge = np.linspace(-1, 1, 500)
-    y_runge = runge_function(x_runge)
-    axes[2].plot(x_runge, y_runge, 'k-', lw=2, label='1/(1+25x^2)')
+    # Пункт 3
+    axes[2].plot(x_dense, y_true, 'k-', lw=2, label='Еталонна функція')
     for n in nodes:
-        x_n = np.linspace(-1, 1, n)
-        y_n = runge_function(x_n)
-        y_interp = [newton_interpolation(x_n, y_n, xi) for xi in x_runge]
-        axes[2].plot(x_runge, y_interp, '--', label=f'n={n}')
-    axes[2].set_ylim(-1, 2)
+        x_n = np.linspace(a, b, n)
+        y_n = f_true(x_n)
+        y_interp = [newton_interpolation(x_n, y_n, xi) for xi in x_dense]
+        axes[2].plot(x_dense, y_interp, '--', label=f'n={n}')
     axes[2].set_title('Пункт 3: Ефект Рунге')
     axes[2].legend()
     axes[2].grid(True)

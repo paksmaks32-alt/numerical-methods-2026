@@ -86,7 +86,7 @@ print(f"Початкова нев'язка (eps): {eps_initial:.2e}")
 eps_target = 1e-14
 x_current = x_0.copy()
 iteration = 0
-max_iterations = 20  # Обмеження, щоб уникнути нескінченного циклу
+max_iterations = 100  # Обмеження, щоб уникнути нескінченного циклу
 
 print("\nПочаток ітераційного уточнення:")
 while iteration < max_iterations:
